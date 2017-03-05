@@ -12,19 +12,12 @@ create a database named `shadowsocks`
 
 import `shadowsocks.sql` into `shadowsocks`
 
-if you upgrade from old version make sure:
-
-  `pass` is varchar(32) NOT NULL,
-  `passwd` is varchar(32) NOT NULL,
-  `last_get_gift_time` not `last_get_gitf_time`
-
-
-edit config.py
+edit shadowsocks/config.py
 
 Example:
 
     #Config
-    MYSQL_HOST = 'mengsky.net'
+    MYSQL_HOST = 'localhost'
     MYSQL_PORT = 3306
     MYSQL_USER = 'root'
     MYSQL_PASS = 'root'
@@ -56,11 +49,10 @@ Database user table column
 
 `port` server port
 
-`t` last keepalive time
+`active_at` last keepalive time
 
-`u` upload transfer
+`flow_up` upload transfer
 
-`d` download transfer (upload & download in here now)
+`flow_down` download transfer (upload & download in here now)
 
 `transfer_enable` if u + d > transfer_enable this server will be stop (db_transfer.py del_server_out_of_bound_safe)
-

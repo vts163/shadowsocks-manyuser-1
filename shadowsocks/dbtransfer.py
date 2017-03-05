@@ -58,87 +58,32 @@ class DbTransfer(object):
     def push_db_all_user(self):
         dt_transfer = self.get_servers_transfer()
 
-        if config.PANEL_VERSION == 'V2':
-            import time
-            query_head = 'UPDATE user'
-            query_sub_when = ''
-            query_sub_when2 = ''
-            query_sub_in = None
-            last_time = time.time()
-            for id in dt_transfer.keys():
-                query_sub_when += ' WHEN %s THEN u+%s' % (id, 0)  # all in d
-                query_sub_when2 += ' WHEN %s THEN d+%s' % (id, dt_transfer[id])
-                if query_sub_in is not None:
-                    query_sub_in += ',%s' % id
-                else:
-                    query_sub_in = '%s' % id
-            if query_sub_when == '':
-                return
-            query_sql = query_head + ' SET u = CASE port' + query_sub_when + \
-                        ' END, d = CASE port' + query_sub_when2 + \
-                        ' END, t = ' + str(int(last_time)) + \
-                        ' WHERE port IN (%s)' % query_sub_in
-            # print query_sql
-            conn = cymysql.connect(host=config.MYSQL_HOST, port=config.MYSQL_PORT, user=config.MYSQL_USER,
-                                   passwd=config.MYSQL_PASS, db=config.MYSQL_DB, charset='utf8')
-            cur = conn.cursor()
-            cur.execute(query_sql)
-            cur.close()
-            conn.commit()
-            conn.close()
-        else:
-            if config.PANEL_VERSION == 'V3':
-                i = 0
-                for id in dt_transfer.keys():
-                    string = ' WHERE `port` = %s' % id
-                    conn = cymysql.connect(host=config.MYSQL_HOST, port=config.MYSQL_PORT, user=config.MYSQL_USER,
-                                           passwd=config.MYSQL_PASS, db=config.MYSQL_DB, charset='utf8')
-                    cur = conn.cursor()
-                    cur.execute('SELECT id FROM user %s '
-                                % (string))
-                    rows = []
-                    for r in cur.fetchall():
-                        rows.append(list(r))
-                    cur.close()
-                    conn.close()
-                    logging.info('port:%s ----> id:%s' % (id, rows[0][0]))
-                    tran = str(dt_transfer[id])
-                    data = {'d': tran, 'node_id': config.NODE_ID, 'u': '0'}
-                    url = config.API_URL + '/users/' + str(rows[0][0]) + '/traffic?key=' + config.API_PASS
-                    data = urllib.urlencode(data)
-                    req = urllib2.Request(url, data)
-                    response = urllib2.urlopen(req)
-                    the_page = response.read()
-                    logging.info('%s - %s - %s' % (url, data, the_page))
-                    i += 1
-                # online user count
-                data = {'count': i}
-                url = config.API_URL + '/nodes/' + config.NODE_ID + '/online_count?key=' + config.API_PASS
-                data = urllib.urlencode(data)
-                req = urllib2.Request(url, data)
-                response = urllib2.urlopen(req)
-                the_page = response.read()
-                logging.info('%s - %s - %s' % (url, data, the_page))
-
-                # load info
-                url = config.API_URL + '/nodes/' + config.NODE_ID + '/info?key=' + config.API_PASS
-                f = open("/proc/loadavg")
-                load = f.read().split()
-                f.close()
-                loadavg = load[0]+' '+load[1]+' '+load[2]+' '+load[3]+' '+load[4]
-                f = open("/proc/uptime")
-                t = f.read().split()
-                uptime = t[0]
-                f.close()
-                data = {'load': loadavg, 'uptime': uptime}
-                data = urllib.urlencode(data)
-                req = urllib2.Request(url, data)
-                response = urllib2.urlopen(req)
-                the_page = response.read()
-                logging.info('%s - %s - %s' % (url, data, the_page))
+        import time
+        query_head = 'UPDATE ss_user'
+        query_sub_when = ''
+        query_sub_when2 = ''
+        query_sub_in = None
+        last_time = time.strftime('%Y-%m-%d %H:%M:%S')
+        for id in dt_transfer.keys():
+            query_sub_when += ' WHEN %s THEN flow_up+%s' % (id, 0)  # all in d
+            query_sub_when2 += ' WHEN %s THEN flow_down+%s' % (id, dt_transfer[id])
+            if query_sub_in is not None:
+                query_sub_in += ',%s' % id
             else:
-                logging.warn('Not support panel version %s' % (config.PANEL_VERSION))
-                return
+                query_sub_in = '%s' % id
+        if query_sub_when == '':
+            return
+        query_sql = query_head + ' SET flow_up = CASE port' + query_sub_when + \
+                    ' END, flow_down = CASE port' + query_sub_when2 + \
+                    ' END, active_at = "' + last_time + '"' + \
+                    ' WHERE port IN (%s)' % query_sub_in
+        # print query_sql
+        conn = cymysql.connect(host=config.MYSQL_HOST, port=config.MYSQL_PORT, user=config.MYSQL_USER,
+                               passwd=config.MYSQL_PASS, db=config.MYSQL_DB, charset='utf8')
+        cur = conn.cursor()
+        cur.execute(query_sql)
+        cur.close()
+        conn.commit()
 
 
     @staticmethod
@@ -146,7 +91,7 @@ class DbTransfer(object):
         conn = cymysql.connect(host=config.MYSQL_HOST, port=config.MYSQL_PORT, user=config.MYSQL_USER,
                                passwd=config.MYSQL_PASS, db=config.MYSQL_DB, charset='utf8')
         cur = conn.cursor()
-        cur.execute("SELECT port, u, d, transfer_enable, passwd, switch, enable FROM user")
+        cur.execute("SELECT port, flow_up, flow_down, transfer_enable, password, is_locked FROM ss_user")
         rows = []
         for r in cur.fetchall():
             rows.append(list(r))
@@ -159,7 +104,7 @@ class DbTransfer(object):
         for row in rows:
             server = json.loads(DbTransfer.get_instance().send_command('stat: {"server_port":%s}' % row[0]))
             if server['stat'] != 'ko':
-                if row[5] == 0 or row[6] == 0:
+                if row[5] == 'Y':
                     # stop disable or switch off user
                     logging.info('db stop server at port [%s] reason: disable' % (row[0]))
                     DbTransfer.send_command('remove: {"server_port":%s}' % row[0])
@@ -172,7 +117,7 @@ class DbTransfer(object):
                     logging.info('db stop server at port [%s] reason: password changed' % (row[0]))
                     DbTransfer.send_command('remove: {"server_port":%s}' % row[0])
             else:
-                if row[5] == 1 and row[6] == 1 and row[1] + row[2] < row[3]:
+                if row[5] == 'N' and row[1] + row[2] < row[3]:
                     logging.info('db start server at port [%s] pass [%s]' % (row[0], row[4]))
                     DbTransfer.send_command('add: {"server_port": %s, "password":"%s"}' % (row[0], row[4]))
                     # print('add: {"server_port": %s, "password":"%s"}'% (row[0], row[4]))
