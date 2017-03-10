@@ -13,8 +13,9 @@ MANAGE_BIND_IP = '127.0.0.1'
 #make sure this port is idle
 MANAGE_PORT = 23333
 
+NODE_ID = 1
 CHECKTIME = 15
-SYNCTIME = 600
+SYNCTIME = 60
 
 #BIND IP
 #if you want bind ipv4 and ipv6 '[::]'
@@ -24,6 +25,6 @@ SS_BIND_IP = '0.0.0.0'
 SS_METHOD = 'rc4-md5'
 
 #LOG CONFIG
-LOG_ENABLE = False
-LOG_LEVEL = logging.DEBUG
+LOG_ENABLE = True
+LOG_LEVEL = logging.INFO
 LOG_FILE = '/var/log/shadowsocks.log'
