@@ -72,6 +72,7 @@ class DbTransfer(object):
         conn = cymysql.connect(**DbTransfer.get_instance().get_mysql_config())
         cursor = conn.cursor()
 
+        # 获取用户和端口的关系
         sql = 'SELECT user_id, port from ss_user'
         cursor.execute(sql)
         port_to_user = {}
@@ -79,33 +80,34 @@ class DbTransfer(object):
             port_to_user[str(item[1])] = item[0]
 
         insert_rows = []
-        sql = 'INSERT INTO ss_transfer (node_id, user_id, flow_up, flow_down) VALUES (%s, %s, %s, %s)'
-        for id in dt_transfer.keys():
-            user_id = port_to_user[str(id)]
-            insert_rows.append([config.NODE_ID, user_id, 0, dt_transfer[id]])
-        cursor.executemany(sql, insert_rows)
-        conn.commit()
-
-        query_head = 'UPDATE ss_user'
-        query_sub_when = ''
-        query_sub_when2 = ''
-        query_sub_in = None
+        insert_sql = 'INSERT INTO ss_transfer (node_id, user_id, flow_up, flow_down) VALUES (%s, %s, %s, %s)'
+        update_head = 'UPDATE ss_user'
+        update_sub_when = ''
+        update_sub_when2 = ''
+        update_sub_in = None
         last_time = time.strftime('%Y-%m-%d %H:%M:%S')
         for id in dt_transfer.keys():
-            query_sub_when += ' WHEN %s THEN flow_up+%s' % (id, 0)  # all in d
-            query_sub_when2 += ' WHEN %s THEN flow_down+%s' % (id, dt_transfer[id])
-            if query_sub_in is not None:
-                query_sub_in += ',%s' % id
+            # 防止受端口扫描等小流量影响
+            if (dt_transfer[id]) < 1024:
+                continue
+            user_id = port_to_user[str(id)]
+            insert_rows.append([config.NODE_ID, user_id, 0, dt_transfer[id]])
+            update_sub_when += ' WHEN %s THEN flow_up+%s' % (user_id, 0)  # all in d
+            update_sub_when2 += ' WHEN %s THEN flow_down+%s' % (user_id, dt_transfer[id])
+            if update_sub_in is not None:
+                update_sub_in += ',%s' % user_id
             else:
-                query_sub_in = '%s' % id
-        if query_sub_when == '':
+                update_sub_in = '%s' % user_id
+        cursor.executemany(insert_sql, insert_rows)
+        conn.commit()
+
+        if update_sub_in is None:
             return
-        sql = query_head + ' SET flow_up = CASE port' + query_sub_when + \
-                    ' END, flow_down = CASE port' + query_sub_when2 + \
+        update_sql = update_head + ' SET flow_up = CASE user_id' + update_sub_when + \
+                    ' END, flow_down = CASE user_id' + update_sub_when2 + \
                     ' END, active_at = "%s"' % (last_time) + \
-                    ' WHERE port IN (%s)' % query_sub_in
-        # print sql
-        cursor.execute(sql)
+                    ' WHERE user_id IN (%s)' % update_sub_in
+        cursor.execute(update_sql)
         cursor.close()
         conn.commit()
 
