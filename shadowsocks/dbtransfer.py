@@ -115,6 +115,12 @@ class DbTransfer(object):
     def pull_db_all_user():
         conn = cymysql.connect(**DbTransfer.get_instance().get_mysql_config())
         cursor = conn.cursor()
+
+        active_at = time.strftime('%Y-%m-%d %H:%M:%S')
+        update_sql = 'UPDATE ss_node SET active_at = "%s" WHERE node_id = %d' % (active_at, config.NODE_ID)
+        cursor.execute(update_sql)
+        conn.commit()
+
         cursor.execute("SELECT port, flow_up, flow_down, transfer_enable, password, is_locked FROM ss_user")
         rows = []
         for r in cursor.fetchall():
