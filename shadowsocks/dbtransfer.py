@@ -73,15 +73,15 @@ class DbTransfer(object):
         cursor = conn.cursor()
 
         # 获取用户和端口的关系
-        sql = 'SELECT user_id, port from ss_user'
+        sql = 'SELECT userId user_id, port from user'
         cursor.execute(sql)
         port_to_user = {}
         for item in cursor.fetchall():
             port_to_user[str(item[1])] = item[0]
 
         insert_rows = []
-        insert_sql = 'INSERT INTO ss_transfer (node_id, user_id, flow_up, flow_down) VALUES (%s, %s, %s, %s)'
-        update_head = 'UPDATE ss_user'
+        insert_sql = 'INSERT INTO transfer (nodeId, userId, flowUp, flowDown) VALUES (%s, %s, %s, %s)'
+        update_head = 'UPDATE user'
         update_sub_when = ''
         update_sub_when2 = ''
         update_sub_in = None
@@ -92,8 +92,8 @@ class DbTransfer(object):
                 continue
             user_id = port_to_user[str(id)]
             insert_rows.append([config.NODE_ID, user_id, 0, dt_transfer[id]])
-            update_sub_when += ' WHEN %s THEN flow_up+%s' % (user_id, 0)  # all in d
-            update_sub_when2 += ' WHEN %s THEN flow_down+%s' % (user_id, dt_transfer[id])
+            update_sub_when += ' WHEN %s THEN flowUp+%s' % (user_id, 0)  # all in d
+            update_sub_when2 += ' WHEN %s THEN flowDown+%s' % (user_id, dt_transfer[id])
             if update_sub_in is not None:
                 update_sub_in += ',%s' % user_id
             else:
@@ -103,10 +103,10 @@ class DbTransfer(object):
 
         if update_sub_in is None:
             return
-        update_sql = update_head + ' SET flow_up = CASE user_id' + update_sub_when + \
-                    ' END, flow_down = CASE user_id' + update_sub_when2 + \
-                    ' END, active_at = "%s"' % (last_time) + \
-                    ' WHERE user_id IN (%s)' % update_sub_in
+        update_sql = update_head + ' SET flowUp = CASE userId' + update_sub_when + \
+                    ' END, flowDown = CASE userId' + update_sub_when2 + \
+                    ' END, activeAt = "%s"' % (last_time) + \
+                    ' WHERE userId IN (%s)' % update_sub_in
         cursor.execute(update_sql)
         cursor.close()
         conn.commit()
@@ -117,11 +117,11 @@ class DbTransfer(object):
         cursor = conn.cursor()
 
         active_at = time.strftime('%Y-%m-%d %H:%M:%S')
-        update_sql = 'UPDATE ss_node SET active_at = "%s" WHERE node_id = %d' % (active_at, config.NODE_ID)
+        update_sql = 'UPDATE node SET activeAt = "%s" WHERE nodeId = %d' % (active_at, config.NODE_ID)
         cursor.execute(update_sql)
         conn.commit()
 
-        cursor.execute("SELECT port, flow_up, flow_down, transfer_enable, password, is_locked FROM ss_user")
+        cursor.execute("SELECT port, flowUp flow_up, flowDown flow_down, transferEnable transfer_enable, password, isLocked is_locked FROM user")
         rows = []
         for r in cursor.fetchall():
             rows.append(list(r))
