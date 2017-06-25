@@ -80,7 +80,7 @@ class DbTransfer(object):
             port_to_user[str(item[1])] = item[0]
 
         insert_rows = []
-        insert_sql = 'INSERT INTO transfer (nodeId, userId, flowUp, flowDown) VALUES (%s, %s, %s, %s)'
+        insert_sql = 'INSERT INTO transfer (nodeId, userId, flowUp, flowDown, activeAt) VALUES (%s, %s, %s, %s, %s)'
         update_head = 'UPDATE user'
         update_sub_when = ''
         update_sub_when2 = ''
@@ -91,7 +91,7 @@ class DbTransfer(object):
             if (dt_transfer[id]) < 1024:
                 continue
             user_id = port_to_user[str(id)]
-            insert_rows.append([config.NODE_ID, user_id, 0, dt_transfer[id]])
+            insert_rows.append([config.NODE_ID, user_id, 0, dt_transfer[id], last_time])
             update_sub_when += ' WHEN %s THEN flowUp+%s' % (user_id, 0)  # all in d
             update_sub_when2 += ' WHEN %s THEN flowDown+%s' % (user_id, dt_transfer[id])
             if update_sub_in is not None:
